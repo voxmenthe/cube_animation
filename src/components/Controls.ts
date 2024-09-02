@@ -1,11 +1,14 @@
-import { characterOptions, chineseCharacters, traditionalCharacters, traditionalCharacterOptions } from '../constants';
+import { characterOptions, traditionalCharacterOptions } from '../constants';
 
 export class Controls {
   private updateCallback: () => void;
   private characterSetSelect: HTMLSelectElement;
+  private selectedCharacters: string[];
 
   constructor(updateCallback: () => void) {
     this.updateCallback = updateCallback;
+    this.characterSetSelect = document.createElement('select');
+    this.selectedCharacters = characterOptions.map(options => options[0]);
     this.createSelectionBoxes();
   }
 
@@ -20,7 +23,6 @@ export class Controls {
     document.body.appendChild(container);
 
     // Add character set toggle
-    this.characterSetSelect = document.createElement('select');
     this.characterSetSelect.id = 'characterSet';
     this.characterSetSelect.style.margin = '5px';
     this.characterSetSelect.style.padding = '5px';
@@ -80,36 +82,40 @@ export class Controls {
   private updateCharacterOptions() {
     const isTraditional = this.characterSetSelect.value === 'traditional';
     const currentOptions = isTraditional ? traditionalCharacterOptions : characterOptions;
-    const currentCharacters = isTraditional ? traditionalCharacters : chineseCharacters;
 
     currentOptions.forEach((options, index) => {
       const select = document.getElementById(`character-${index}`) as HTMLSelectElement;
-      select.innerHTML = '';
+      if (select) {
+        select.innerHTML = '';
 
-      options.forEach(char => {
-        const option = document.createElement('option');
-        option.value = char;
-        option.textContent = char;
-        select.appendChild(option);
-      });
+        options.forEach(char => {
+          const option = document.createElement('option');
+          option.value = char;
+          option.textContent = char;
+          select.appendChild(option);
+        });
 
-      select.value = currentCharacters[index];
-      select.onchange = (e) => {
-        currentCharacters[index] = (e.target as HTMLSelectElement).value;
-        this.updateCallback();
-      };
+        select.value = this.selectedCharacters[index];
+        select.onchange = (e) => {
+          if (e.target instanceof HTMLSelectElement) {
+            this.selectedCharacters[index] = e.target.value;
+            this.updateCallback();
+          }
+        };
+      }
     });
   }
 
   getCubeCount(): number {
-    return parseInt((document.getElementById('cubeCount') as HTMLSelectElement).value);
+    const cubeCountSelect = document.getElementById('cubeCount') as HTMLSelectElement;
+    return cubeCountSelect ? parseInt(cubeCountSelect.value) : 3; // Default to 3 if element not found
   }
 
   getCharacterSet(): 'simplified' | 'traditional' {
     return this.characterSetSelect.value as 'simplified' | 'traditional';
   }
 
-  getSelectedCharacters(characterSet: 'simplified' | 'traditional'): string[] {
-    return characterSet === 'traditional' ? traditionalCharacters : chineseCharacters;
+  getSelectedCharacters(): string[] {
+    return this.selectedCharacters;
   }
 }
