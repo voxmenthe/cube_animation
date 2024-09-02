@@ -1,83 +1,158 @@
 import * as THREE from 'three';
 
-// Three.js setup
+// Array of Chinese characters to use
+const chineseCharacters = ['福', '禄', '寿', '喜', '财', '安', '康', '宁', '德', '智'];
+
+// Function to generate a random color
+function getRandomColor(): THREE.Color {
+  return new THREE.Color(Math.random(), Math.random(), Math.random());
+}
+
+// Function to generate a texture with a Chinese character
+function createCharacterTexture(character: string): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to get 2D context');
+
+  // Set background color
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Set text properties
+  context.fillStyle = '#000000';
+  context.font = 'bold 200px Arial, SimHei, "Microsoft YaHei", sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+
+  // Draw the character
+  context.fillText(character, canvas.width / 2, canvas.height / 2);
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+// Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Create a more complex geometry for interesting deformations
-const geometry = new THREE.BoxGeometry(1, 1, 1, 10, 10, 10);
-const material = new THREE.MeshPhongMaterial({ color: 0x00ff00, wireframe: false });
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
+// Create multiple cubes
+const cubes: THREE.Mesh[] = [];
+const cubeCount = 27; // 3x3x3 grid
+const gridSize = 3;
+const originalSpacing = 4;
+const originalScale = 1;
+let currentSpacing = originalSpacing;
+let currentScale = originalScale;
 
-// Add lighting
-const light = new THREE.PointLight(0xffffff, 1, 100);
-light.position.set(0, 0, 10);
-scene.add(light);
+let index = 0;
+for (let x = 0; x < gridSize; x++) {
+  for (let y = 0; y < gridSize; y++) {
+    for (let z = 0; z < gridSize; z++) {
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+      
+      // Create materials for each face with different characters
+      const materials = chineseCharacters.slice(0, 6).map(char => {
+        const texture = createCharacterTexture(char);
+        return new THREE.MeshPhongMaterial({ map: texture });
+      });
 
-camera.position.z = 5;
+      const cube = new THREE.Mesh(geometry, materials);
+      
+      // Position cubes in a grid formation
+      cube.position.x = (x - 1) * originalSpacing;
+      cube.position.y = (y - 1) * originalSpacing;
+      cube.position.z = (z - 1) * originalSpacing;
+      
+      scene.add(cube);
+      cubes.push(cube);
 
-// Mouse position tracking
-const mouse = new THREE.Vector2();
-const windowHalf = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2);
-
-// Event listeners
-document.addEventListener('mousemove', onMouseMove);
-window.addEventListener('resize', onWindowResize);
-
-function onMouseMove(event: MouseEvent) {
-    mouse.x = (event.clientX - windowHalf.x) / windowHalf.x;
-    mouse.y = (event.clientY - windowHalf.y) / windowHalf.y * -1;
+      index++;
+      if (index >= cubeCount) break;
+    }
+    if (index >= cubeCount) break;
+  }
+  if (index >= cubeCount) break;
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    windowHalf.set(window.innerWidth / 2, window.innerHeight / 2);
-}
+camera.position.z = 12;
 
-// Store the original geometry for reference
-const originalGeometry = geometry.clone();
+// Scroll wheel control variables
+let scrollValue = 0;
+let lastScrollTime = Date.now();
+const inactivityDelay = 20000; // 2 seconds
+const scrollSensitivity = 0.0005; // Reduced sensitivity for finer control
+
+// Wheel event listener
+window.addEventListener('wheel', (event) => {
+  scrollValue += event.deltaY * scrollSensitivity;
+  scrollValue = Math.max(-1, Math.min(1, scrollValue)); // Expanded range from -1 to 1
+  lastScrollTime = Date.now();
+});
 
 // Animation loop
 function animate() {
-    requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
-    // Rotate cube based on mouse position
-    cube.rotation.x += 0.01 + mouse.y * 0.05;
-    cube.rotation.y += 0.01 + mouse.x * 0.05;
+  const currentTime = Date.now();
+  const timeSinceLastScroll = currentTime - lastScrollTime;
 
-    // Change cube color based on mouse position
-    const hue = (mouse.x + 1) / 2; // Map mouse.x from [-1, 1] to [0, 1]
-    const saturation = (mouse.y + 1) / 2; // Map mouse.y from [-1, 1] to [0, 1]
-    material.color.setHSL(hue, saturation, 0.5);
+  if (timeSinceLastScroll < inactivityDelay) {
+    // Update cube size and spacing based on scroll value
+    currentScale = THREE.MathUtils.lerp(currentScale, originalScale * (1 + scrollValue), 0.1);
+    currentSpacing = THREE.MathUtils.lerp(currentSpacing, originalSpacing * (1 + scrollValue * 1.5), 0.1);
+  } else {
+    // Gradually revert to original size and spacing
+    currentScale = THREE.MathUtils.lerp(currentScale, originalScale, 0.05);
+    currentSpacing = THREE.MathUtils.lerp(currentSpacing, originalSpacing, 0.05);
+    scrollValue = THREE.MathUtils.lerp(scrollValue, 0, 0.05);
+  }
 
-    // Deform cube based on time
-    const positions = geometry.attributes.position.array as Float32Array;
-    const originalPositions = originalGeometry.attributes.position.array as Float32Array;
-    const time = Date.now() * 0.001;
+  // Update cube positions and scale
+  index = 0;
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) {
+      for (let z = 0; z < gridSize; z++) {
+        const cube = cubes[index];
+        cube.position.x = (x - 1) * currentSpacing;
+        cube.position.y = (y - 1) * currentSpacing;
+        cube.position.z = (z - 1) * currentSpacing;
+        cube.scale.setScalar(currentScale);
 
-    for (let i = 0; i < positions.length; i += 3) {
-        const x = originalPositions[i];
-        const y = originalPositions[i + 1];
-        const z = originalPositions[i + 2];
-        
-        const distance = Math.sqrt(x * x + y * y + z * z);
-        const deformationAmount = Math.sin(distance * 5 + time) * 0.1;
-        
-        const scaleFactor = Math.max(0.5, Math.min(1.5, 1 + deformationAmount));
-        
-        positions[i] = x * scaleFactor;
-        positions[i + 1] = y * scaleFactor;
-        positions[i + 2] = z * scaleFactor;
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+
+        index++;
+        if (index >= cubeCount) break;
+      }
+      if (index >= cubeCount) break;
     }
-    geometry.attributes.position.needsUpdate = true;
+    if (index >= cubeCount) break;
+  }
 
-    renderer.render(scene, camera);
+  renderer.render(scene, camera);
 }
 
 animate();
+
+// Handle window resizing
+window.addEventListener('resize', () => {
+  const newWidth = window.innerWidth;
+  const newHeight = window.innerHeight;
+
+  camera.aspect = newWidth / newHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(newWidth, newHeight);
+});
+
+// Add lighting for better visibility
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+directionalLight.position.set(5, 5, 5);
+scene.add(directionalLight);
