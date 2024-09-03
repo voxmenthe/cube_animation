@@ -18,5 +18,6 @@ export function createCharacterTexture(character: string): THREE.Texture {
 
   const texture = new THREE.Texture(canvas);
   texture.needsUpdate = true;
+  texture.center.set(0.5, 0.5); // Set rotation center to middle of texture
   return texture;
 }

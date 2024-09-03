@@ -34,14 +34,8 @@ export class CubeManager {
     const dynamicSpacing = this.cubeSize * 1.2; // Adjust spacing as needed
     const characters = this.controls.getSelectedCharacters(characterSet);
     
-    // Define an array of pastel colors for cube faces
     const pastelColors = [
-      0xffb3ba, // Light pink
-      0xffdfba, // Light peach
-      0xffffba, // Light yellow
-      0xbaffc9, // Light mint
-      0xbae1ff, // Light blue
-      0xe1baff  // Light purple
+      0xffb3ba, 0xffdfba, 0xffffba, 0xbaffc9, 0xbae1ff, 0xe1baff
     ];
     
     for (let x = 0; x < this.gridSize; x++) {
@@ -49,20 +43,19 @@ export class CubeManager {
         for (let z = 0; z < this.gridSize; z++) {
           const geometry = new THREE.BoxGeometry(this.cubeSize, this.cubeSize, this.cubeSize);
           
-          // Create materials for each face with different characters and colors
           const materials = characters.map((char, index) => {
             const texture = createCharacterTexture(char);
+            texture.center.set(0.5, 0.5); // Set rotation center to middle of texture
             return new THREE.MeshPhongMaterial({ 
               map: texture,
               color: pastelColors[index % pastelColors.length],
               transparent: true,
-              opacity: 0.8 // Add some transparency
+              opacity: 0.8
             });
           });
 
           const cube = new THREE.Mesh(geometry, materials);
           
-          // Position cubes in a grid formation with dynamic spacing
           cube.position.x = (x - (this.gridSize - 1) / 2) * dynamicSpacing;
           cube.position.y = (y - (this.gridSize - 1) / 2) * dynamicSpacing;
           cube.position.z = (z - (this.gridSize - 1) / 2) * dynamicSpacing;
@@ -90,8 +83,20 @@ export class CubeManager {
   updateCubeRotations() {
     this.cubes.forEach((cube) => {
       if (cube.visible) {
-        cube.rotation.x += 0.01;
-        cube.rotation.y += 0.01;
+        cube.rotation.x += 0.01; // Rotate only around x-axis for front-to-back rotation
+
+        // Ensure the cube always faces the camera
+        cube.quaternion.setFromEuler(new THREE.Euler(cube.rotation.x, 0, 0));
+
+        // Counter-rotate the textures to keep characters upright
+        if (Array.isArray(cube.material)) {
+          cube.material.forEach((material) => {
+            if (material instanceof THREE.MeshPhongMaterial && material.map) {
+              material.map.rotation = -cube.rotation.x;
+              material.map.needsUpdate = true;
+            }
+          });
+        }
       }
     });
   }
